@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>WebGL 3x3 Grid</title>
+    <style>
+        body { margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background: #cfcece; }
+        canvas { border: 1px solid #555;
+            background-color: #555; }
+    </style>
+</head>
+<body>
+    <canvas id="webgl-canvas" width="600" height="600"></canvas>
+
+    <!-- Vertex Shader -->
+    <script id="vs" type="x-shader/x-vertex">
+        attribute vec2 a_position;
+        uniform vec2 u_offset; // espaco entre os quadrados
+        
+        void main() {
+            gl_Position = vec4(a_position + u_offset, 0.0, 1.0);
+        }
+    </script>
+
+    <!-- Fragment Shader -->
+    <script id="fs" type="x-shader/x-fragment">
+        precision mediump float;
+        uniform vec4 u_color;
+
+        void main() {
+            gl_FragColor = u_color;
+        }
+    </script>
+
+    <script src="app.js"></script>
+</body>
+</html>
