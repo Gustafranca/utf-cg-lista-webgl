@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Disco Quadrado - WebGL</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #f0f0f0; }
+        canvas { display: block; width: 100vw; height: 100vh; }
+        .instructions {
+            position: absolute; top: 10px; left: 10px;
+            font-family: sans-serif; background: rgba(66, 64, 60, 0.7);
+            padding: 10px; border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="instructions">Pressione <strong>'c'</strong> para alternar os contornos.</div>
+    <canvas id="webgl-canvas"></canvas>
+
+    <!-- Vertex Shader -->
+    <script id="vs" type="x-shader/x-vertex">
+        attribute vec2 a_position;
+        void main() {
+            gl_Position = vec4(a_position, 0.0, 1.0);
+        }
+    </script>
+
+    <!-- Fragment Shader -->
+    <script id="fs" type="x-shader/x-fragment">
+        precision mediump float;
+        uniform vec4 u_color;
+        void main() {
+            gl_FragColor = u_color;
+        }
+    </script>
+
+    <script>
+        const canvas = document.getElementById('webgl-canvas');
+        const gl = canvas.getContext('webgl');
+
+        if (!gl) {
+            alert('WebGL não suportado');
+        }
+
+        // --- Configuração dos Shaders ---
+        function createShader(gl, type, source) {
+            const shader = gl.createShader(type);
+            gl.shaderSource(shader, source);
+            gl.compileShader(shader);
+            return shader;
+        }
+
+        const vsSource = document.getElementById('vs').text;
+        const fsSource = document.getElementById('fs').text;
+        const vertexShader = createShader(gl, gl.VERTEX_SHADER, vsSource);
+        const fragmentShader = createShader(gl, gl.FRAGMENT_SHADER, fsSource);
+
+        const program = gl.createProgram();
+        gl.attachShader(program, vertexShader);
+        gl.attachShader(program, fragmentShader);
+        gl.linkProgram(program);
+        gl.useProgram(program);
+
+        // --- Definição dos Vértices (Triangulação) ---
+        // Coordenadas: Externas (0.6) e Internas (0.3)
+        // Sequência para TRIANGLE_STRIP: Externo1, Interno1, Externo2, Interno2...
+        const vertices = new Float32Array([
+            -0.6,  0.6,   -0.3,  0.3,  // Topo-Esquerda
+             0.6,  0.6,    0.3,  0.3,  // Topo-Direita
+             0.6, -0.6,    0.3, -0.3,  // Baixo-Direita
+            -0.6, -0.6,   -0.3, -0.3,  // Baixo-Esquerda
+            -0.6,  0.6,   -0.3,  0.3   // Fecha o loop
+        ]);
+
+        const buffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+        gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+
+        const a_position = gl.getAttribLocation(program, 'a_position');
+        gl.enableVertexAttribArray(a_position);
+        gl.vertexAttribPointer(a_position, 2, gl.FLOAT, false, 0, 0);
+
+        const u_color = gl.getUniformLocation(program, 'u_color');
+
+        // --- Lógica de Interação ---
+        let showOutlines = false;
+
+        window.addEventListener('keydown', (e) => {
+            if (e.key.toLowerCase() === 'c') {
+                showOutlines = !showOutlines;
+                render();
+            }
+        });
+
+        function render() {
+            // Ajustar viewport
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+
+            gl.clearColor(1, 1, 1, 1);
+            gl.clear(gl.COLOR_BUFFER_BIT);
+
+            // 1. Desenha o preenchimento Azul
+            gl.uniform4f(u_color, 5/255, 131/255, 139/255, 0.7); // Azul
+            gl.drawArrays(gl.TRIANGLE_STRIP, 0, 10);
+
+            // 2. Desenha os contornos Pretos (se ativo)
+            if (showOutlines) {
+                gl.uniform4f(u_color, 0.0, 0.0, 0.0, 1.0); // Preto
+                // Usamos LINE_STRIP com a mesma contagem para mostrar a triangulação
+                gl.drawArrays(gl.LINE_STRIP, 0, 10);
+            }
+        }
+
+        // Renderização inicial
+        render();
+
+        // Redesenhar ao redimensionar a janela
+        window.onresize = render;
+    </script>
+</body>
+</html>
