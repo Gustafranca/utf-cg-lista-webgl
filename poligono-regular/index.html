@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Polígono Regular - WebGL</title>
+  <style>
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #111;
+      color: white;
+      font-family: Arial, sans-serif;
+    }
+
+    canvas {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    .info {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      background: rgba(0, 0, 0, 0.082);
+      padding: 10px 14px;
+      border-radius: 10px;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+  <div class="info" id="info">
+    Número de lados: 5<br>
+    Use + e - para alterar
+  </div>
+
+  <canvas id="glcanvas"></canvas>
+
+  <script>
+    // ============================
+    // CONFIGURAÇÃO
+    // ============================
+    let numLados = 5;
+
+    // "Resolução lógica" fixa do mundo
+    const LARGURA_MUNDO = 100;
+    const ALTURA_MUNDO = 100;
+
+    const canvas = document.getElementById("glcanvas");
+    const gl = canvas.getContext("webgl");
+
+    if (!gl) {
+      alert("WebGL não suportado no seu navegador.");
+    }
+
+    // ============================
+    // SHADERS
+    // ============================
+    const vertexShaderSource = `
+      attribute vec2 aPosition;
+      void main() {
+        gl_Position = vec4(aPosition, 0.0, 1.0);
+      }
+    `;
+
+    const fragmentShaderSource = `
+      precision mediump float;
+      void main() {
+        gl_FragColor = vec4(0.2, 0.8, 1.0, 1.0);
+      }
+    `;
+
+    function criarShader(gl, tipo, fonte) {
+      const shader = gl.createShader(tipo);
+      gl.shaderSource(shader, fonte);
+      gl.compileShader(shader);
+
+      if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+        console.error(gl.getShaderInfoLog(shader));
+        gl.deleteShader(shader);
+        return null;
+      }
+
+      return shader;
+    }
+
+    function criarPrograma(gl, vsSource, fsSource) {
+      const vertexShader = criarShader(gl, gl.VERTEX_SHADER, vsSource);
+      const fragmentShader = criarShader(gl, gl.FRAGMENT_SHADER, fsSource);
+
+      const program = gl.createProgram();
+      gl.attachShader(program, vertexShader);
+      gl.attachShader(program, fragmentShader);
+      gl.linkProgram(program);
+
+      if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+        console.error(gl.getProgramInfoLog(program));
+        gl.deleteProgram(program);
+        return null;
+      }
+
+      return program;
+    }
+
+    const program = criarPrograma(gl, vertexShaderSource, fragmentShaderSource);
+    gl.useProgram(program);
+
+    const positionLocation = gl.getAttribLocation(program, "aPosition");
+    const positionBuffer = gl.createBuffer();
+
+    // ============================
+    // AJUSTAR CANVAS
+    // ============================
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      gl.viewport(0, 0, canvas.width, canvas.height);
+      desenhar();
+    }
+
+    window.addEventListener("resize", resizeCanvas);
+
+    // ============================
+    // CONVERTER COORDENADAS DO MUNDO
+    // PARA O ESPAÇO DO WEBGL
+    // ============================
+    function mundoParaClip(x, y) {
+      const aspectCanvas = canvas.width / canvas.height;
+      const aspectMundo = LARGURA_MUNDO / ALTURA_MUNDO;
+
+      let larguraVisivel = LARGURA_MUNDO;
+      let alturaVisivel = ALTURA_MUNDO;
+
+      // Ajusta a área visível para manter proporção
+      if (aspectCanvas > aspectMundo) {
+        larguraVisivel = ALTURA_MUNDO * aspectCanvas;
+      } else {
+        alturaVisivel = LARGURA_MUNDO / aspectCanvas;
+      }
+
+      const xClip = x / (larguraVisivel / 2);
+      const yClip = y / (alturaVisivel / 2);
+
+      return [xClip, yClip];
+    }
+
+    // ============================
+    // GERAR VÉRTICES DO POLÍGONO
+    // ============================
+    function gerarVerticesPoligono(n) {
+      const vertices = [];
+
+      // Centro do polígono no mundo
+      const centroX = 0;
+      const centroY = 0;
+      const raio = 30;
+
+      // Primeiro vértice = centro (para TRIANGLE_FAN)
+      let centroClip = mundoParaClip(centroX, centroY);
+      vertices.push(centroClip[0], centroClip[1]);
+
+      for (let i = 0; i <= n; i++) {
+        const t = i * 2 * Math.PI / n;
+        const x = centroX + raio * Math.cos(t);
+        const y = centroY + raio * Math.sin(t);
+
+        const [xClip, yClip] = mundoParaClip(x, y);
+        vertices.push(xClip, yClip);
+      }
+
+      return new Float32Array(vertices);
+    }
+
+    // ============================
+    // DESENHAR
+    // ============================
+    function desenhar() {
+      gl.clearColor(0.05, 0.05, 0.08, 1.0);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+
+      const vertices = gerarVerticesPoligono(numLados);
+
+      gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+      gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+
+      gl.enableVertexAttribArray(positionLocation);
+      gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
+
+      gl.drawArrays(gl.TRIANGLE_FAN, 0, vertices.length / 2);
+
+      document.getElementById("info").innerHTML = `
+        Número de lados: ${numLados}<br>
+        Use <b>+</b> e <b>-</b> para alterar
+      `;
+    }
+
+    // ============================
+    // TECLADO
+    // ============================
+    window.addEventListener("keydown", (event) => {
+      if (event.key === "+" || event.key === "=") {
+        numLados++;
+        desenhar();
+      }
+
+      if ((event.key === "-" || event.key === "_") && numLados > 3) {
+        numLados--;
+        desenhar();
+      }
+    });
+
+    resizeCanvas();
+  </script>
+</body>
+</html>
